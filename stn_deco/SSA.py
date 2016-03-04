@@ -25,8 +25,17 @@ from log import *
 from DataImporter import *
 
 class SSA(object):
-	"""docstring for SSA"""
+	"""SSA is the main class for this analysis. 
+	SSA stands for Single Subject Analysis. For each single-subject analysis a new object of this class is created. 
+
+	"""
 	def __init__(self, subject_id, TR, base_dir):
+		"""SSA takes subject_id, TR and base_dir as arguments.
+		subject_id is a string identifying the subject
+		TR is the TR in seconds
+		base_dir is the system path where the subjects' data folders are, and where the SSA's hdf5 file is stored. 
+		
+		"""
 		super(SSA, self).__init__()
 		for k,v in kwargs.items():
 			setattr(self, k, v)
