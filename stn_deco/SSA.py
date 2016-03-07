@@ -130,31 +130,27 @@ class SSA(object):
 
 		fd.calculate_rsq()
 		self.logger.info("%s Deco R squared is %1.3f" % (roi, fd.rsq[0]))
-		# shell()
-		fd.bootstrap_on_residuals(nr_repetitions=1000)
 
 		f = pl.figure(figsize = (8,6))
 		s = f.add_subplot(111)
 		s.set_title('FIR responses, Rsq is %1.3f'%fd.rsq)
 		for i, evt in enumerate([evt.replace('.', '_') for evt in event_types]):
 			pl.plot(fd.deconvolution_interval_timepoints, fd.betas_for_cov(evt))
-			mb = fd.bootstrap_betas_per_event_type[i].mean(axis = -1)
-			sb = fd.bootstrap_betas_per_event_type[i].std(axis = -1)
 
-			pl.fill_between(fd.deconvolution_interval_timepoints, 
-				mb - sb, 
-				mb + sb,
-				color = 'k',
-				alpha = 0.1)
-
-		# fd.covariates, being a dictionary, cannot be assumed to maintain the event order. 
-		# working on a fix here....
 		pl.legend([evt.replace('.', '_') for evt in event_types], loc = 2)
+		s.set_xlabel('time [s]')
+		s.set_ylabel('Z-scored BOLD')
 		sn.despine(offset=10)
 
 		pl.tight_layout()
-		pl.savefig(os.path.join(base_dir, subject_id, subject_id + '_' + roi + '.pdf'))
-		# pl.show()
+		pl.savefig(os.path.join(self.base_dir, self.subject_id, self.subject_id + '_' + roi + '.pdf'))
+
+		deco_results = pd.DataFrame(np.squeeze([fd.betas_for_cov(evt.replace('.', '_')) for evt in event_types]).T, 
+								index = fd.deconvolution_interval_timepoints, columns = [evt.replace('.', '_') for evt in event_types])
+
+		h5f = pd.HDFStore(self.hdf5_file, mode = 'a', complevel=9, complib='zlib' )
+		h5f.put('deco_results/%s'%(roi), deco_results)
+		h5f.close()
 
 
 						
