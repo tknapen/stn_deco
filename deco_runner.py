@@ -19,16 +19,25 @@ from joblib import Parallel, delayed
 from stn_deco.SSA import SSA
 
 TR = 2.0
-BASE_DIR = '/home/shared/STN_DECO/'
+# BASE_DIR = '/home/shared/STN_DECO/'
+BASE_DIR = '/Users/knapen/Desktop/'
+
+# check out the folders for all the different subjects
+subject_folders = subprocess.Popen('ls -1 ' + BASE_DIR, 
+			shell=True, stdout=subprocess.PIPE).communicate()[0].split('\n')[:-1]
 
 
-def run_subject(subject_id):
 
-	ssa = SSA(subject_id = subject_id, base_dir = BASE_DIR, TR = TR)
+
+def run_subject(subject_id, base_dir, tr):
+
+	ssa = SSA(subject_id = subject_id, base_dir = base_dir, TR = tr)
 
 	# preprocessing:
 	# --------------
 	# ssa.import_data()
+
+	ssa.deconvolution_roi()
 
 	return True
 
@@ -40,10 +49,10 @@ def run_subject(subject_id):
 def analyze_subjects(sjs, parallel = True ):
 	if len(sjs) > 1 and parallel: 
 		# parallel processing with joblib
-		res = Parallel(n_jobs = len(sjs), verbose = 9)(delayed(run_subject)(sjs[i]) for i in range(len(sjs)))
+		res = Parallel(n_jobs = len(sjs), verbose = 9)(delayed(run_subject)(sjs[i], BASE_DIR, TR) for i in range(len(sjs)))
 	else:
 		for i in range(len(sjs)):
-			run_subject(sjs[i])
+			run_subject(sjs[i], BASE_DIR, TR)
 # 
 
 
@@ -52,10 +61,7 @@ def analyze_subjects(sjs, parallel = True ):
 #####################################################
 
 def main():
-	analyze_subjects([subjects[s] for s in subject_indices], \
-		[run_arrays[s] for s in subject_indices], [session_dates[s] for s in subject_indices], \
-		[projects[s] for s in subject_indices], \
-		parallel = False)
+	analyze_subjects(subject_folders, parallel = False)
 
 if __name__ == '__main__':
 	main()

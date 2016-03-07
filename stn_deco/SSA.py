@@ -19,17 +19,21 @@ import pandas as pd
 
 import seaborn as sn
 sn.set(style="ticks")
+from fir import FIRDeconvolution
 
 from log import *
 
 from DataImporter import *
+
+from IPython import embed as shell
+
 
 class SSA(object):
 	"""SSA is the main class for this analysis. 
 	SSA stands for Single Subject Analysis. For each single-subject analysis a new object of this class is created. 
 
 	"""
-	def __init__(self, subject_id, TR, base_dir):
+	def __init__(self, subject_id, TR, base_dir, **kwargs):
 		"""SSA takes subject_id, TR and base_dir as arguments.
 		subject_id is a string identifying the subject
 		TR is the TR in seconds
@@ -40,8 +44,12 @@ class SSA(object):
 		for k,v in kwargs.items():
 			setattr(self, k, v)
 
+		self.subject_id = subject_id
+		self.base_dir = base_dir
+		self.TR = TR
+
 		# this ssa uses a specific hdf5 file for storing data
-		self.hdf5_file = os.path.join(base_dir, subject_id + '.h5')
+		self.hdf5_file = os.path.join(base_dir, subject_id, subject_id + '.h5')
 
 		# setup logging for this subject's analysis.
 		self.logger = logging.getLogger( self.__class__.__name__ )
@@ -63,11 +71,24 @@ class SSA(object):
 		h5f.close()
 		return raw_events
 
+	def preprocess_events(self, event_conditions = ['ww', 'wl.u', 'wl.l', 'll']):
+		self.evts = self.events()
+		corr_incorr_trials = (self.evts['Cor_incor'] == 0 ) + ( self.evts['Cor_incor'] == 1 )
+		self.event_types_times = {evc: self.evts['Time'][(self.evts['Cond'] == evc) * (corr_incorr_trials)] for evc in event_conditions}
+
 	def raw_roi_data(self, roi):
 		h5f = pd.HDFStore(self.hdf5_file)
 		raw_data = h5f['original_data/'+roi]
 		h5f.close()
 		return raw_data
+
+	def preprocess_roi_data(self, raw_data, pp_type = 'None'):
+		if pp_type == 'Z':
+			return (raw_data - raw_data.mean(axis = 0)) / raw_data.std(axis = 0)
+		elif pp_type == 'psc':
+			return 100 * (raw_data - raw_data.mean(axis = 0)) / raw_data.mean(axis = 0)
+		elif pp_type == 'None':
+			return raw_data
 
 	def rois(self):
 		h5f = pd.HDFStore(self.hdf5_file)
@@ -75,7 +96,65 @@ class SSA(object):
 		h5f.close()
 		return rois
 
+	def deconvolution_roi(self, 
+					roi = 'maxSTN25exc', 
+					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
+					deco_sample_frequency = 2.0, 
+					deconvolution_interval = [-4,20], 
+					pp_type = 'Z'):
+		"""deconvolution_roi takes data from a ROI and performs deconvolution on it.
+		arguments are roi (string), event_types (list of event type strings),
+		deco_sample_frequency (float), interval (list of two timepoints)
+		"""
+		self.preprocess_events(event_conditions = event_types)
+		data = self.preprocess_roi_data(self.raw_roi_data(roi), pp_type = pp_type)
+
+		# first, we initialize the object
+		fd = FIRDeconvolution(
+						signal = data.squeeze(), 
+						events = [self.event_types_times[evt] for evt in event_types], 
+						event_names = [evt.replace('.', '_') for evt in event_types], 
+						sample_frequency = 1.0/self.TR,
+						deconvolution_frequency = deco_sample_frequency,
+						deconvolution_interval = deconvolution_interval
+						)
+
+		# we then tell it to create its design matrix
+		fd.create_design_matrix()
+
+		# perform the actual regression, in this case with the statsmodels backend
+		fd.regress(method = 'lstsq')
+
+		# and partition the resulting betas according to the different event types
+		fd.betas_for_events()
+
+		fd.calculate_rsq()
+		self.logger.info("%s Deco R squared is %1.3f" % (roi, fd.rsq[0]))
+		# shell()
+		fd.bootstrap_on_residuals(nr_repetitions=1000)
+
+		f = pl.figure(figsize = (8,6))
+		s = f.add_subplot(111)
+		s.set_title('FIR responses, Rsq is %1.3f'%fd.rsq)
+		for i, evt in enumerate([evt.replace('.', '_') for evt in event_types]):
+			pl.plot(fd.deconvolution_interval_timepoints, fd.betas_for_cov(evt))
+			mb = fd.bootstrap_betas_per_event_type[i].mean(axis = -1)
+			sb = fd.bootstrap_betas_per_event_type[i].std(axis = -1)
+
+			pl.fill_between(fd.deconvolution_interval_timepoints, 
+				mb - sb, 
+				mb + sb,
+				color = 'k',
+				alpha = 0.1)
+
+		# fd.covariates, being a dictionary, cannot be assumed to maintain the event order. 
+		# working on a fix here....
+		pl.legend([evt.replace('.', '_') for evt in event_types], loc = 2)
+		sn.despine(offset=10)
+
+		pl.tight_layout()
+		pl.savefig(os.path.join(base_dir, subject_id, subject_id + '_' + roi + '.pdf'))
+		# pl.show()
 
 
-	
-		
+						
