@@ -76,7 +76,9 @@ class DataImporter(object):
 		"""Find the rois that have been saved in a specific folder."""
 		nii_file_list = subprocess.Popen('ls ' + os.path.join(fmri_folder, FOLDER_NAMES[0], '*.nii.gz.txt'), 
 			shell=True, stdout=subprocess.PIPE).communicate()[0].split('\n')[:-1]
-		self.rois = [os.path.split(niif)[-1][:-len('.nii.gz.txt')].split('_')[-1] for niif in nii_file_list]		
+		# for now, a shortcut to run everything faster...
+		# self.rois = ['maxSTN25exc']		
+		self.rois = [os.path.split(niif)[-1][:-len('.nii.gz.txt')].split('_')[-1] for niif in nii_file_list]
 
 	def import_data(self):
 		"""import_data imports all event and fmri data in a subject's folder. 
@@ -98,7 +100,6 @@ class DataImporter(object):
 		# then, we try to work out all the events
 		self.event_files = [os.path.join(self.ssa.base_dir, self.ssa.subject_id, fn, self.ssa.subject_id + 'Event' + fn[-1] + '_test.txt') for fn in FOLDER_NAMES]
 		self.all_event_data = self.import_event_files(self.event_files)
-
 
 	def write_out_original_data(self):
 		"""write out the imported data to the hdf5 file for this ssa.

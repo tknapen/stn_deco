@@ -73,8 +73,12 @@ class SSA(object):
 
 	def preprocess_events(self, event_conditions = ['ww', 'wl.u', 'wl.l', 'll']):
 		self.evts = self.events()
-		corr_incorr_trials = (self.evts['Cor_incor'] == 0 ) + ( self.evts['Cor_incor'] == 1 )
-		self.event_types_times = {evc: self.evts['Time'][(self.evts['Cond'] == evc) * (corr_incorr_trials)] for evc in event_conditions}
+		corr_incorr_trials = (self.evts['Cor_incor'] == 0 ) | ( self.evts['Cor_incor'] == 1 )
+		stim_onset_times = self.evts['Time'] - self.evts['RT'] / 1000.0
+		rts = self.evts['RT'] / 1000.0
+
+		self.event_types_times = {evc: np.array(stim_onset_times[(self.evts['Cond'] == evc) & (corr_incorr_trials)]) for evc in event_conditions}
+		self.event_types_durs = {evc: np.array(rts[(self.evts['Cond'] == evc) & (corr_incorr_trials)]) for evc in event_conditions}
 
 	def raw_roi_data(self, roi):
 		h5f = pd.HDFStore(self.hdf5_file)
@@ -99,9 +103,10 @@ class SSA(object):
 	def deconvolution_roi(self, 
 					roi = 'maxSTN25exc', 
 					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
-					deco_sample_frequency = 2.0, 
-					deconvolution_interval = [-4,20], 
-					pp_type = 'Z'):
+					deco_sample_frequency = 4.0, 
+					deconvolution_interval = [-7,18], 
+					pp_type = 'Z',
+					ridge = False):
 		"""deconvolution_roi takes data from a ROI and performs deconvolution on it.
 		arguments are roi (string), event_types (list of event type strings),
 		deco_sample_frequency (float), interval (list of two timepoints)
@@ -109,21 +114,30 @@ class SSA(object):
 		self.preprocess_events(event_conditions = event_types)
 		data = self.preprocess_roi_data(self.raw_roi_data(roi), pp_type = pp_type)
 
+		nuis_data = np.hstack([self.preprocess_roi_data(self.raw_roi_data(nuis_roi), pp_type = 'None') for nuis_roi in ['GM','WM','CV']])
+
 		# first, we initialize the object
 		fd = FIRDeconvolution(
 						signal = data.squeeze(), 
-						events = [self.event_types_times[evt] for evt in event_types], 
+						events = [np.array(self.event_types_times[evt]) for evt in event_types], 
 						event_names = [evt.replace('.', '_') for evt in event_types], 
+						durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
 						sample_frequency = 1.0/self.TR,
 						deconvolution_frequency = deco_sample_frequency,
 						deconvolution_interval = deconvolution_interval
 						)
 
 		# we then tell it to create its design matrix
-		fd.create_design_matrix()
+		fd.create_design_matrix(intercept = True)
 
-		# perform the actual regression, in this case with the statsmodels backend
-		fd.regress(method = 'lstsq')
+		nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
+		# fd.add_continuous_regressors_to_design_matrix(nuis_data_resampled)
+
+		# perform the actual regression
+		if ridge:
+			fd.ridge_regress(cv = 20, alphas = np.r_[0,np.linspace(0.01, 100, 9)])	
+		else:
+			fd.regress(method = 'lstsq')
 
 		# and partition the resulting betas according to the different event types
 		fd.betas_for_events()
@@ -151,6 +165,16 @@ class SSA(object):
 		h5f = pd.HDFStore(self.hdf5_file, mode = 'a', complevel=9, complib='zlib' )
 		h5f.put('deco_results/%s'%(roi), deco_results)
 		h5f.close()
+
+	def gather_deco_results(self, roi):
+		"""gather_deco_results takes pre-saved roi-based from the hdf5 file and returns them as the dataframe that they are.
+		"""
+		h5f = pd.HDFStore(self.hdf5_file, mode = 'r')
+		deco_res = h5f.get('deco_results/%s'%(roi))
+		h5f.close()
+
+		return deco_res
+	
 
 
 						
