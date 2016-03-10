@@ -34,15 +34,20 @@ def run_across(subject_ids, base_dir, tr):
 	ssas = [SSA(subject_id = s, base_dir = base_dir, TR = tr) for s in subject_ids]
 
 	agg = Aggregator(ssas)
-	# agg.roi_deco_results(roi = 'maxSTN25exc')
-	# agg.roi_deco_results(roi = 'V1')
 
-	agg.roi_deco_corrs(roi = 'maxSTN25exc')
-	agg.roi_deco_corrs(roi = 'V1')
-	# agg.roi_deco_corrs(roi = 'FFA23')
-	# agg.roi_deco_corrs(roi = 'GPe30exc')
-	
-	# agg.roi_deco_corrs(roi = 'preSMAsmall', event_type = 'wl_u')
+	for roi in ['preSMAsmall', 'FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri']:
+	# for roi in ['maxSTN25exc']:
+		for et in ['ww', 'wl_u', 'll']:
+			# important categories:
+			# 'SSRT', 'RT.ll', 'RT.ww', 'RT.wl_u'
+			# agg.roi_deco_corrs(roi = roi, corr = ['alphaL','alphaG', 'SSRT', 'RTdiff.ll', 'RTdiff.ww'], event_type = et, name_suffix = 'all')
+			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', 'alphaL','alphaG'], event_type = et, name_suffix = 'all')
+			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', "Acdiff.ll", 'RTdiff.ll'], event_type = et, name_suffix = 'SAR')
+			# agg.roi_deco_corrs(roi = roi, corr = ["Qdww", "Qdll", "Qdwl.u"], event_type = et, name_suffix = 'Q')
+			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', 'medRTll', 'medRTww', 'medRTwl.u'], event_type = et, name_suffix = 'all')
+			pass
+		agg.roi_corrs(roi = roi)
+	# agg.roi_deco_groups(roi = 'maxSTN25exc')
 
 	pl.show()
 

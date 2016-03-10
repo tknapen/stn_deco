@@ -65,6 +65,10 @@ class SSA(object):
 		dI.import_data()
 		dI.write_out_original_data()
 
+	def import_moco_parameters_from_feats(self, base_folder_name = 'scFeat'):
+		dI = DataImporter(self)
+		dI.import_moco_parameters_from_feats(base_folder_name = base_folder_name)
+
 	def events(self):
 		h5f = pd.HDFStore(self.hdf5_file)
 		raw_events = h5f['original_data/events']
@@ -103,8 +107,8 @@ class SSA(object):
 	def deconvolution_roi(self, 
 					roi = 'maxSTN25exc', 
 					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
-					deco_sample_frequency = 4.0, 
-					deconvolution_interval = [-7,18], 
+					deco_sample_frequency = 6.0, 
+					deconvolution_interval = [-3,15], 
 					pp_type = 'Z',
 					ridge = False):
 		"""deconvolution_roi takes data from a ROI and performs deconvolution on it.
@@ -113,8 +117,8 @@ class SSA(object):
 		"""
 		self.preprocess_events(event_conditions = event_types)
 		data = self.preprocess_roi_data(self.raw_roi_data(roi), pp_type = pp_type)
-
 		nuis_data = np.hstack([self.preprocess_roi_data(self.raw_roi_data(nuis_roi), pp_type = 'None') for nuis_roi in ['GM','WM','CV']])
+		moco_nuisances = self.raw_roi_data('moco_pars')
 
 		# first, we initialize the object
 		fd = FIRDeconvolution(
@@ -130,8 +134,10 @@ class SSA(object):
 		# we then tell it to create its design matrix
 		fd.create_design_matrix(intercept = True)
 
-		nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
-		# fd.add_continuous_regressors_to_design_matrix(nuis_data_resampled)
+		# decided not to use motion / nuisances
+		# nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
+		# moco_nuis_data_resampled = sp.signal.resample(moco_nuisances.T, fd.resampled_signal_size, axis = -1)
+		# fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
 
 		# perform the actual regression
 		if ridge:

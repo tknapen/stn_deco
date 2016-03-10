@@ -34,12 +34,10 @@ def run_subject(subject_id, base_dir, tr):
 	# preprocessing:
 	# --------------
 	# ssa.import_data()
+	# ssa.import_moco_parameters_from_feats()
 
-	ssa.deconvolution_roi(roi = 'maxSTN25exc')
-	ssa.deconvolution_roi(roi = 'V1')
-	# ssa.deconvolution_roi(roi = 'FFA23')
-	# ssa.deconvolution_roi(roi = 'GPe30exc')
-
+	for roi in ['preSMAsmall', 'FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri']:
+		ssa.deconvolution_roi(roi = roi)
 
 	return True
 
@@ -51,7 +49,7 @@ def run_subject(subject_id, base_dir, tr):
 def analyze_subjects(sjs, parallel = True ):
 	if len(sjs) > 1 and parallel: 
 		# parallel processing with joblib
-		res = Parallel(n_jobs = -1, verbose = 9)(delayed(run_subject)(sjs[i], BASE_DIR, TR) for i in range(len(sjs)))
+		res = Parallel(n_jobs = 24, verbose = 9)(delayed(run_subject)(sjs[i], BASE_DIR, TR) for i in range(len(sjs)))
 	else:
 		for i in range(len(sjs)):
 			run_subject(sjs[i], BASE_DIR, TR)
@@ -62,6 +60,7 @@ def analyze_subjects(sjs, parallel = True ):
 #####################################################
 
 def main():
+	# analyze_subjects(subject_folders, parallel = True)
 	analyze_subjects(subject_folders, parallel = True)
 
 if __name__ == '__main__':
