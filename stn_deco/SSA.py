@@ -78,7 +78,7 @@ class SSA(object):
 	def preprocess_events(self, event_conditions = ['ww', 'wl.u', 'wl.l', 'll']):
 		self.evts = self.events()
 		corr_incorr_trials = (self.evts['Cor_incor'] == 0 ) | ( self.evts['Cor_incor'] == 1 )
-		stim_onset_times = self.evts['Time'] - self.evts['RT'] / 1000.0
+		stim_onset_times = self.evts['Time']#  - self.evts['RT'] / 1000.0
 		rts = self.evts['RT'] / 1000.0
 
 		self.event_types_times = {evc: np.array(stim_onset_times[(self.evts['Cond'] == evc) & (corr_incorr_trials)]) for evc in event_conditions}
@@ -117,8 +117,8 @@ class SSA(object):
 		"""
 		self.preprocess_events(event_conditions = event_types)
 		data = self.preprocess_roi_data(self.raw_roi_data(roi), pp_type = pp_type)
-		nuis_data = np.hstack([self.preprocess_roi_data(self.raw_roi_data(nuis_roi), pp_type = 'None') for nuis_roi in ['GM','WM','CV']])
-		moco_nuisances = self.raw_roi_data('moco_pars')
+		nuis_data = np.hstack([self.preprocess_roi_data(self.raw_roi_data(nuis_roi), pp_type = 'Z') for nuis_roi in ['GM','WM','CV']])
+		moco_nuisances = self.preprocess_roi_data(self.raw_roi_data('moco_pars'), pp_type = 'Z')
 
 		# first, we initialize the object
 		fd = FIRDeconvolution(
@@ -135,9 +135,10 @@ class SSA(object):
 		fd.create_design_matrix(intercept = True)
 
 		# decided not to use motion / nuisances
-		# nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
-		# moco_nuis_data_resampled = sp.signal.resample(moco_nuisances.T, fd.resampled_signal_size, axis = -1)
-		# fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
+		nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
+		moco_nuis_data_resampled = sp.signal.resample(moco_nuisances.T, fd.resampled_signal_size, axis = -1)
+		# fd.add_continuous_regressors_to_design_matrix(np.r_[nuis_data_resampled, moco_nuis_data_resampled])
+		fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
 
 		# perform the actual regression
 		if ridge:

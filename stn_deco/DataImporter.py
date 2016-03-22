@@ -21,6 +21,7 @@ from IPython import embed as shell
 
 FOLDER_NAMES = ["Test1", "Test2", "Test3"]
 NUISANCES = ['WM', 'GM', 'CV']
+COLLAPSED_ROIS = ['SThL', 'SThR', 'STRL', 'STRR']
 
 class DataImporter(object):
 	"""
@@ -45,7 +46,7 @@ class DataImporter(object):
 						filter = True, 
 						window_length = 120, 
 						polyorder = 3, 
-						zscore_pv = True, 
+						psc = True, 
 						zscore_av = True):
 		"""Import a single fmri file and return its contents.
 		Savitzky Golay filtering is applied to the data on a per-voxel basis (filter = True), 
@@ -56,6 +57,7 @@ class DataImporter(object):
 		for per-voxel and across-voxels zscoring. 
 		"""
 		data = np.loadtxt(fmri_file, skiprows = skiprows)
+		# shell()
 		if filter:
 			wl = int(window_length / self.ssa.TR)
 			if wl % 2 == 0:	# needs odd window_length
@@ -63,8 +65,8 @@ class DataImporter(object):
 			savgol_lp_data = sp.signal.savgol_filter(data, axis = 0, window_length = wl, polyorder = polyorder, mode = 'nearest')
 			data = data - savgol_lp_data
 
-		if zscore_pv:
-			data = (data-data.mean(axis = 0))/data.std(axis = 0)
+		if psc:
+			data = 100.0 * (data/(data + savgol_lp_data).mean(axis = 0))
 
 		if average:
 			data = data.mean(axis = 1)[:,np.newaxis]
@@ -74,12 +76,13 @@ class DataImporter(object):
 
 		return data
 
-	def import_fmri_data_files(self, fmri_files, average_across_voxels = True, zscore_pv = False, zscore_av = True):
+	def import_fmri_data_files(self, fmri_files, filter = False, average_across_voxels = True, psc = False, zscore_av = True, skiprows = 4):
 		"""Import all fmri files (from a given ROI), concatenate them and return them"""
-		fmri_list_data = [self.import_fmri_file(f, average = average_across_voxels, zscore_pv = zscore_pv, zscore_av = zscore_av) for f in fmri_files]
+		fmri_list_data = [self.import_fmri_file(f, filter = filter, average = average_across_voxels, psc = psc, zscore_av = zscore_av, skiprows = skiprows) for f in fmri_files]
 		nr_trs_per_run = [fd.shape[0] for fd in fmri_list_data]
 		self.ssa.logger.info([fd.shape for fd in fmri_list_data])
-		return nr_trs_per_run, np.vstack(fmri_list_data)
+		# shell()
+		return nr_trs_per_run, np.concatenate(fmri_list_data)
 
 	def import_event_file(self, event_file):
 		"""Import a single event file and return its contents"""
@@ -101,11 +104,12 @@ class DataImporter(object):
 
 	def find_rois(self, fmri_folder = ''):
 		"""Find the rois that have been saved in a specific folder."""
-		nii_file_list = subprocess.Popen('ls ' + os.path.join(fmri_folder, FOLDER_NAMES[0], '*.nii.gz.txt'), 
+		nii_file_list = subprocess.Popen('ls ' + os.path.join(fmri_folder, FOLDER_NAMES[0], '*.txt'), 
 			shell=True, stdout=subprocess.PIPE).communicate()[0].split('\n')[:-1]
-		# for now, a shortcut to run everything faster...
-		# self.rois = ['maxSTN25exc']		
-		self.rois = [os.path.split(niif)[-1][:-len('.nii.gz.txt')].split('_')[-1] for niif in nii_file_list]
+		# the list of rois
+		self.rois = [os.path.split(niif)[-1][:-len('.txt')].split('_')[-1] for niif in nii_file_list]
+		# make sure event files aren't rois
+		self.rois.remove('test')
 
 	def import_moco_parameters_from_feats(self, base_folder_name = 'scFeat'):
 		"""import_moco_parameters_from_feats takes moco parameters from a separate folder hierarchy.
@@ -145,12 +149,18 @@ class DataImporter(object):
 		# dict to contain all imported fMRI data
 		self.all_imported_roi_data = {}
 		for roi in self.rois:
-			data_files = [os.path.join(self.ssa.base_dir, self.ssa.subject_id, fn, self.ssa.subject_id + '_' + roi + '.nii.gz.txt') 
+			self.ssa.logger.info('taking data from ' + roi)
+			data_files = [os.path.join(self.ssa.base_dir, self.ssa.subject_id, fn, self.ssa.subject_id + '_MNI_' + roi + '.txt') 
 							for fn in FOLDER_NAMES]
-			self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files)
-			# if rd in NUISANCES: # average all nuisance voxels together for one timecourse: saves unnecessary space
-			# now, with no correspondence across voxels from run to run, average everything.
-			# rd = rd.mean(axis = 1)[:,np.newaxis]
+			if roi in NUISANCES: # these are single-voxel format
+				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 0)
+			elif roi in COLLAPSED_ROIS: # these are single-voxel format
+				# re-do the data_files names for the collapsed rois
+				data_files = [os.path.join(self.ssa.base_dir, self.ssa.subject_id, fn, self.ssa.subject_id + '_MNI_weight_normalized_fsl2mm_' + roi + '.txt') 
+					for fn in FOLDER_NAMES]
+				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 0)
+			else: # these are multi-voxel format - all rois really
+				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 4)
 			self.all_imported_roi_data.update({ roi: pd.DataFrame(rd) } )
 
 		# then, we try to work out all the events
@@ -161,6 +171,10 @@ class DataImporter(object):
 		"""write out the imported data to the hdf5 file for this ssa.
 		I'm using some compression for now, since it's a lot of data in all.
 		"""
+		try:
+			os.system("rm " + self.ssa.hdf5_file)
+		except OSError:
+			pass
 		h5f = pd.HDFStore(self.ssa.hdf5_file, mode = 'w', complevel=9, complib='zlib' )
 		# create original data group in the hdf5 file and put events in it
 		h5f.put('original_data/events', self.all_event_data)

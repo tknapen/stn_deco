@@ -21,7 +21,8 @@ from stn_deco.SSA import SSA
 TR = 2.0
 # BASE_DIR = '/home/raw_data/STN_DECO/Events/'
 # BASE_DIR = '/Users/knapen/Desktop/'
-BASE_DIR = '/home/shared/STN_DECO/Events/'
+# BASE_DIR = '/home/shared/STN_DECO/Events/'
+BASE_DIR = '/home/shared/STN_DECO/MNIEvents/'
 
 # check out the folders for all the different subjects
 subject_folders = subprocess.Popen('ls -1 ' + BASE_DIR, 
@@ -37,7 +38,7 @@ def run_subject(subject_id, base_dir, tr):
 	# ssa.import_moco_parameters_from_feats()
 
 	for roi in ['preSMAsmall', 'FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri']:
-		ssa.deconvolution_roi(roi = roi)
+		ssa.deconvolution_roi(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-7,20])
 
 	return True
 
@@ -60,7 +61,6 @@ def analyze_subjects(sjs, parallel = True ):
 #####################################################
 
 def main():
-	# analyze_subjects(subject_folders, parallel = True)
 	analyze_subjects(subject_folders, parallel = True)
 
 if __name__ == '__main__':

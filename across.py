@@ -46,7 +46,7 @@ def run_across(subject_ids, base_dir, tr):
 			# agg.roi_deco_corrs(roi = roi, corr = ["Qdww", "Qdll", "Qdwl.u"], event_type = et, name_suffix = 'Q')
 			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', 'medRTll', 'medRTww', 'medRTwl.u'], event_type = et, name_suffix = 'all')
 			pass
-		agg.roi_corrs(roi = roi)
+		agg.roi_corrs(roi = roi, corr = ['SSRT', 'alphaL', 'alphaG'])
 	# agg.roi_deco_groups(roi = 'maxSTN25exc')
 
 	pl.show()

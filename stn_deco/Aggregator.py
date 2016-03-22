@@ -135,7 +135,6 @@ class Aggregator(object):
 		roi_data = np.array(roi_data_panel)
 		conditions = np.array(list(roi_data_panel.axes[-1]))
 		
-		event_types = self.ssas[0].gather_deco_results(roi).keys()
 		times = pd.Series(self.ssas[0].gather_deco_results(roi).axes[0])
 
 		for s in self.ssas:
@@ -144,11 +143,11 @@ class Aggregator(object):
 		par_dict = {par: np.array([np.array(s.evts[par])[0] for s in self.ssas]) for par in corr}
 
 		f = pl.figure(figsize = (12,8))
-		for i, evt in enumerate(event_types):
+		for i, evt in enumerate(conditions):
 			idx = conditions == evt
 			rd = np.squeeze(roi_data[:,:,idx])
 			
-			s = f.add_subplot(3,len(event_types),i+1)
+			s = f.add_subplot(3,len(conditions),i+1)
 			s.set_title(evt)
 			s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
 			s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
@@ -161,7 +160,7 @@ class Aggregator(object):
 
 			correlations, pvals = np.array([[sp.stats.pearsonr(rd[:,tp], par_dict[par]) for tp in np.arange(times.shape[0])] for par in corr]).transpose(2,0,1)
 			# pvals = np.array([[-np.log10(sp.stats.pearsonr(rd[:,tp], par_dict[par])[1]) for tp in np.arange(times.shape[0])] for par in corr])
-			s = f.add_subplot(3,len(event_types),len(event_types) + i+1)
+			s = f.add_subplot(3,len(conditions),len(conditions) + i+1)
 			s.set_title(evt)
 			s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
 			s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
@@ -173,7 +172,7 @@ class Aggregator(object):
 			s.set_xlim([np.min(times), np.max(times)])
 			s.set_ylim([-0.75, 0.75])
 
-			s = f.add_subplot(3,len(event_types), 2*len(event_types) + i+1)
+			s = f.add_subplot(3,len(conditions), 2*len(conditions) + i+1)
 			s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
 			s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
 			for c, par in enumerate(corr):
@@ -189,8 +188,6 @@ class Aggregator(object):
 		pl.tight_layout()
 
 		pl.savefig(os.path.join(os.path.split(self.ssas[0].base_dir[:-1])[0], 'figs', roi + '_' + 'corr_%s.pdf'%name_suffix))
-
-
 
 	def roi_deco_groups(self, 
 				roi = 'maxSTN25exc', 
