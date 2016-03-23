@@ -70,6 +70,7 @@ class Aggregator(object):
 		par_dict = {par: np.array([np.array(s.evts[par])[0] for s in self.ssas]) for par in corr}
 
 		f = pl.figure(figsize = (4,12))
+		f.suptitle(roi)
 
 		s = f.add_subplot(411)
 		s.set_title('FIR responses')
@@ -90,7 +91,7 @@ class Aggregator(object):
 		sn.despine(offset=10)
 
 		s = f.add_subplot(413)
-		s.set_title(roi + '\nevent type ' + event_type + '\ncorrelations')
+		s.set_title('event type ' + event_type + '\ncorrelations')
 
 		for i, k in enumerate(corr):
 			pl.plot(times, 
@@ -105,7 +106,7 @@ class Aggregator(object):
 		s.set_xlim([np.min(times), np.max(times)])
 
 		s = f.add_subplot(414)
-		s.set_title(roi + '\nevent type ' + event_type + '\ncorrelations')
+		s.set_title('event type ' + event_type + '\ncorrelations')
 
 		for i, k in enumerate(corr):
 			pl.plot(times, 
@@ -143,6 +144,7 @@ class Aggregator(object):
 		par_dict = {par: np.array([np.array(s.evts[par])[0] for s in self.ssas]) for par in corr}
 
 		f = pl.figure(figsize = (12,8))
+		f.suptitle(roi)
 		for i, evt in enumerate(conditions):
 			idx = conditions == evt
 			rd = np.squeeze(roi_data[:,:,idx])
@@ -191,7 +193,7 @@ class Aggregator(object):
 
 	def roi_deco_groups(self, 
 				roi = 'maxSTN25exc', 
-				event_types = ['ll', 'wl_u', 'ww'],
+				event_types = ['ll', 'wl_u', 'wl_l', 'ww'],
 				name_suffix = 'SSRT'):
 		"""Take deco results from a list of ssa objects, 
 		using their gather_deco_results method. Then, we correlate the 
@@ -210,6 +212,7 @@ class Aggregator(object):
 		SSRT_group = np.array([np.array(s.evts[u'SSRT_group'])[0] == 'SSRT_long' for s in self.ssas])
 
 		f = pl.figure(figsize = (12,4))
+		f.suptitle(roi)
 		for i, evt in enumerate(event_types):
 			s = f.add_subplot(1,len(event_types),i+1)
 			idx = conditions == evt

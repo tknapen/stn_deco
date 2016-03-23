@@ -34,11 +34,12 @@ def run_subject(subject_id, base_dir, tr):
 
 	# preprocessing:
 	# --------------
-	# ssa.import_data()
-	# ssa.import_moco_parameters_from_feats()
+	ssa.import_data()
+	ssa.import_moco_parameters_from_feats()
 
 	for roi in ['preSMAsmall', 'FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri']:
-		ssa.deconvolution_roi(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-7,20])
+	# for roi in ['FFA23', 'maxSTN25exc', 'V1']:
+		ssa.deconvolution_roi(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-6,16], pp_type = 'average_across_voxels')
 
 	return True
 

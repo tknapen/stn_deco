@@ -41,7 +41,7 @@ class DataImporter(object):
 
 	def import_fmri_file(self, 
 						fmri_file, 
-						skiprows = 4, 
+						skiprows = 3, 
 						average = True, 
 						filter = True, 
 						window_length = 120, 
@@ -76,7 +76,7 @@ class DataImporter(object):
 
 		return data
 
-	def import_fmri_data_files(self, fmri_files, filter = False, average_across_voxels = True, psc = False, zscore_av = True, skiprows = 4):
+	def import_fmri_data_files(self, fmri_files, filter = False, average_across_voxels = True, psc = False, zscore_av = True, skiprows = 3):
 		"""Import all fmri files (from a given ROI), concatenate them and return them"""
 		fmri_list_data = [self.import_fmri_file(f, filter = filter, average = average_across_voxels, psc = psc, zscore_av = zscore_av, skiprows = skiprows) for f in fmri_files]
 		nr_trs_per_run = [fd.shape[0] for fd in fmri_list_data]
@@ -118,7 +118,7 @@ class DataImporter(object):
 		"""
 		par_names = ['x', 'y', 'z', 'roll', 'pitch', 'yaw']
 
-		moco_list_data = [np.loadtxt(os.path.join(self.ssa.base_dir.replace('Events', base_folder_name), self.ssa.subject_id, fn + '.feat', 'mc', 'prefiltered_func_data_mcf.par'))
+		moco_list_data = [np.loadtxt(os.path.join(self.ssa.base_dir.replace('MNIEvents', base_folder_name), self.ssa.subject_id, fn + '.feat', 'mc', 'prefiltered_func_data_mcf.par'))
 			for fn in FOLDER_NAMES]
 
 		moco_list_data = [(fd-fd.mean(axis = 0))/fd.std(axis = 0) for fd in moco_list_data]
@@ -160,7 +160,7 @@ class DataImporter(object):
 					for fn in FOLDER_NAMES]
 				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 0)
 			else: # these are multi-voxel format - all rois really
-				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 4)
+				self.nr_trs_per_run, rd = self.import_fmri_data_files(data_files, filter = True, average_across_voxels = False, psc = True, zscore_av = False, skiprows = 3)
 			self.all_imported_roi_data.update({ roi: pd.DataFrame(rd) } )
 
 		# then, we try to work out all the events

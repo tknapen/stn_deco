@@ -78,7 +78,7 @@ class SSA(object):
 	def preprocess_events(self, event_conditions = ['ww', 'wl.u', 'wl.l', 'll']):
 		self.evts = self.events()
 		corr_incorr_trials = (self.evts['Cor_incor'] == 0 ) | ( self.evts['Cor_incor'] == 1 )
-		stim_onset_times = self.evts['Time']#  - self.evts['RT'] / 1000.0
+		stim_onset_times = self.evts['Time']
 		rts = self.evts['RT'] / 1000.0
 
 		self.event_types_times = {evc: np.array(stim_onset_times[(self.evts['Cond'] == evc) & (corr_incorr_trials)]) for evc in event_conditions}
@@ -95,6 +95,8 @@ class SSA(object):
 			return (raw_data - raw_data.mean(axis = 0)) / raw_data.std(axis = 0)
 		elif pp_type == 'psc':
 			return 100 * (raw_data - raw_data.mean(axis = 0)) / raw_data.mean(axis = 0)
+		elif pp_type == 'average_across_voxels':
+			return raw_data.mean(axis = 1)
 		elif pp_type == 'None':
 			return raw_data
 
@@ -109,7 +111,7 @@ class SSA(object):
 					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
 					deco_sample_frequency = 6.0, 
 					deconvolution_interval = [-3,15], 
-					pp_type = 'Z',
+					pp_type = 'None',
 					ridge = False):
 		"""deconvolution_roi takes data from a ROI and performs deconvolution on it.
 		arguments are roi (string), event_types (list of event type strings),
@@ -125,7 +127,7 @@ class SSA(object):
 						signal = data.squeeze(), 
 						events = [np.array(self.event_types_times[evt]) for evt in event_types], 
 						event_names = [evt.replace('.', '_') for evt in event_types], 
-						durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
+						# durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
 						sample_frequency = 1.0/self.TR,
 						deconvolution_frequency = deco_sample_frequency,
 						deconvolution_interval = deconvolution_interval
@@ -138,7 +140,7 @@ class SSA(object):
 		nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
 		moco_nuis_data_resampled = sp.signal.resample(moco_nuisances.T, fd.resampled_signal_size, axis = -1)
 		# fd.add_continuous_regressors_to_design_matrix(np.r_[nuis_data_resampled, moco_nuis_data_resampled])
-		fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
+		# fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
 
 		# perform the actual regression
 		if ridge:
