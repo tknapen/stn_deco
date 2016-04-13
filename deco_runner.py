@@ -40,7 +40,7 @@ def run_subject(subject_id, base_dir, tr):
 	for roi in ['FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri', 'DLPFCposterior', 'LO31', 'maxGPi30exc', 'GPe30exc', 'Putamen40exc']: # 'preSMAsmall', 
 	# for roi in ['FFA23', 'maxSTN25exc', 'V1']:
 		# ssa.deconvolution_roi(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-6,16], rsq_threshold = 0.25)
-		ssa.deconvolution_roi_avg(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-2,10], pp_type = 'average_across_voxels')
+		ssa.deconvolution_roi_avg(roi = roi, deco_sample_frequency = 4.0, deconvolution_interval = [-4,16], pp_type = 'average_across_voxels')
 
 
 	return True

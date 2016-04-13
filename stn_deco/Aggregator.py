@@ -16,7 +16,7 @@ import pandas as pd
 import mne
 
 import seaborn as sn
-sn.set(style="ticks")
+# sn.set(style="ticks")
 
 from log import *
 from IPython import embed as shell
@@ -256,13 +256,14 @@ class Aggregator(object):
 				event_type = 'll',
 				name_suffix = '',
 				group = 'deco_results',
-				stats_threshold = 0.01):
+				stats_threshold = 0.05):
 		"""Take deco results from a list of ssa objects, 
 		using their gather_deco_results method. Then, we correlate the 
 		tiecourses with a corr argument variable per timepoint"""
 
 		roi_data_panel = pd.Panel({s.subject_id: s.gather_deco_results(roi, group = group) for s in self.ssas})
 		roi_data = np.array(roi_data_panel)
+		roi_data_dt = np.hstack((np.zeros((roi_data.shape[0], 1, roi_data.shape[-1])), np.diff(roi_data, axis = 1)))
 		conditions = np.array(list(roi_data_panel.axes[-1]))
 
 		roi_data_diffs = np.squeeze(np.array([	roi_data[:,:,conditions=='ll'] - roi_data[:,:,conditions=='ww'], 
@@ -272,7 +273,7 @@ class Aggregator(object):
 
 		cond_diffs = ['ll-ww', 'll-wl_u', 'ww-wl_u']
 
-		which_event_types = conditions != 'wl_l'
+		which_event_types = (conditions != 'wl_l') & (conditions != 'wl_u')
 
 		event_types = self.ssas[0].gather_deco_results(roi).keys()
 		times = pd.Series(self.ssas[0].gather_deco_results(roi).axes[0])
@@ -285,59 +286,101 @@ class Aggregator(object):
 		par_dict = {'SSRT': np.array([np.array(s.evts['SSRT'])[0] for s in self.ssas])}
 		which_subjects_valid_ssrt = par_dict['SSRT'] != 0
 
-		ssrt_stats = np.array([sp.stats.pearsonr(x[which_subjects_valid_ssrt], par_dict['SSRT'][which_subjects_valid_ssrt]) for x in roi_data[:,:,et_index].T])
-		significant_corr_times = ssrt_stats[:,1] < stats_threshold
+		ssrt_stats = np.array([[sp.stats.pearsonr(x[which_subjects_valid_ssrt], par_dict['SSRT'][which_subjects_valid_ssrt]) for x in roi_data[:,:,et].T] for et in range(len(event_types))])
+		significant_corr_times = ssrt_stats[et_index,:,1] < stats_threshold
+		peak_corr_time = ssrt_stats[et_index,:,1] == ssrt_stats[et_index,:,1].min()
 
-		par_dict['SSRT']
-		ll_average_sign_times = roi_data[which_subjects_valid_ssrt][:,significant_corr_times,-1].mean(axis = 1)
+		ssrt_stats_dt = np.array([[sp.stats.pearsonr(x[which_subjects_valid_ssrt], par_dict['SSRT'][which_subjects_valid_ssrt]) for x in roi_data_dt[:,:,et].T] for et in range(len(event_types))])
 
-		# shell()
 
-		f = pl.figure(figsize = (6,6))
-		s = f.add_subplot(111)
-		s.set_title('FIR responses ' + roi)
-		s.axvspan(np.array(times[significant_corr_times])[0], np.array(times[significant_corr_times])[-1], color = 'k', alpha = 0.1)
-		sn.tsplot(roi_data[:,:,which_event_types], time = times, condition = event_types[which_event_types], ci = 68, color = ['g','b','r'])
+		ll_average_sign_times = roi_data[which_subjects_valid_ssrt][:,peak_corr_time,-1].squeeze()
+		which_times_peak = (times > 3) & (times < 6)
+		which_times_trough = (times > 7) & (times < 13)
+
+		# peak_values = roi_data[which_subjects_valid_ssrt][:,significant_corr_times,et_index][:,0]
+		# trough_values = roi_data[which_subjects_valid_ssrt][:,significant_corr_times,et_index][:,-1]
+		peak_values = roi_data[which_subjects_valid_ssrt][:,which_times_peak,et_index].max(axis = 1)
+		trough_values = roi_data[which_subjects_valid_ssrt][:,which_times_trough,et_index].min(axis = 1)
+
+		value_diffs_ll = peak_values - trough_values
+
+		SSRT_group = np.array([np.array(s.evts[u'SSRT_group'])[0] == 'SSRT_long' for s in self.ssas])[which_subjects_valid_ssrt]
+
+		f = pl.figure(figsize = (8,8))
+		s = f.add_subplot(221)
+		s.set_title('FIR responses')
+		s.axvspan(np.array(times[significant_corr_times])[0], np.array(times[significant_corr_times])[-1], color = 'r', alpha = 0.1)
+		sn.tsplot(roi_data[:,:,which_event_types], time = times, condition = event_types[which_event_types], ci = 68, color = ['g','r'])
 		s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
-		s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
-		s.set_xlabel('time [s]')
-		s.set_xlim([-1,9])
-		s.set_ylabel('% signal change')
+		# s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
+		s.set_xlim([0,15])
+		s.set_xticks([0,5,10,15])
+		s.set_ylabel('% signal change STN')
 		sn.despine(offset=10)
 
 		pl.tight_layout()
-		pl.savefig(os.path.join(os.path.split(self.ssas[0].base_dir[:-1])[0], 'figs', roi + '_ll_corr_deco_%s.pdf'%name_suffix))
 
-				# this is an inset axes over the main axes
-		f = pl.figure(figsize = (3,3))
-		inset = f.add_subplot(111)
-
-		# inset = pl.axes([.75, .75, .25, .25], axisbg = [0,0,0,0])
-		# pl.plot(par_dict['SSRT'], ll_average_sign_times, 'ro', mew = 0)
-
+		inset = f.add_subplot(222)
 		g = sn.regplot(x=par_dict['SSRT'][which_subjects_valid_ssrt], y=ll_average_sign_times, color='r')
 		print sp.stats.pearsonr(par_dict['SSRT'][which_subjects_valid_ssrt], ll_average_sign_times)
 
 		pl.title('Correlation')
 		inset.set_xlabel('SSRT')
-		inset.set_ylabel('% signal change ' + roi)
-		inset.set_ylim([-0.12,0.16])
+		inset.set_ylabel('% signal change STN ll')
+		inset.set_ylim([-0.2,0.2])
 		inset.set_xlim([0,600])
+		inset.set_yticks([-0.2, 0, 0.2])
+		inset.set_xticks([0, 300, 600])
+		inset.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
 		sn.despine(offset=10)
-		# inset.axis('off')
-		# pl.xticks([])
-		# pl.yticks([])
-		# s = f.add_subplot(212)
-		# sn.tsplot(roi_data_diffs, time = times, condition = cond_diffs, ci = 68, color = ['k','r','g'])
-		# plot_significance_lines(roi_data_diffs, times, -0.025, 0.005, p_value_cutoff = 0.05, pal = ['g','b','r'])
-		# s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
+
+		# shell()
+
+		s3 = f.add_subplot(223)	
+		for i, evt in enumerate(np.arange(len(which_event_types))[which_event_types]): 
+			which_event = event_types[evt]
+			# pvals = np.array([[-np.log10(sp.stats.pearsonr(rd[:,tp], par_dict[par])[1]) for tp in np.arange(times.shape[0])] for par in corr])
+			# s.set_title(evt)
+			# print correlations, pvals
+			# for c, par in enumerate(corr):
+			pl.plot(times, ssrt_stats[evt,:,0], label = which_event, c = ['g','r'][i])
+			if which_event == 'll':
+				sig_lims = np.array(ssrt_stats[evt,significant_corr_times,1])[[0,-1]]
+				sig_corrs = np.array(ssrt_stats[evt,significant_corr_times,0])[[0,-1]]
+				print 'siglims %s, corrs = %s'%(str(sig_lims), str(sig_corrs))
+				
+				s3.axhline(np.mean(sig_corrs), color = 'k', alpha = 0.25, lw = 2.5, ls = '--')
+			print evt, i
+		s3.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
+		# s3.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
+		s3.set_ylabel('Pearson\'s r SSRT')
+		sn.despine(offset=10)
+		s3.set_xlim([0,15])
+		s3.set_xticks([0,5,10,15])
+		s3.set_ylim([-0.25, 0.5])
+		s3.set_yticks([-0.25, 0, 0.25, 0.5])
+
+		s3.set_xlabel('time [s]')
+		pl.legend()
+
+		this_condition_data = (roi_data[SSRT_group,:,et_index],roi_data[-SSRT_group,:,et_index])
+		s = f.add_subplot(224)
+		# s.set_title(evt)
+		sn.tsplot(this_condition_data[0], time = times, condition = ['long SSRT'], ci = 68, color = 'k')
+		sn.tsplot(this_condition_data[1], time = times, condition = ['short SSRT'], ci = 68, color = 'gray', alpha = 0.5)
+		s.axhline(0, color = 'k', alpha = 0.5, lw = 0.5)
 		# s.axvline(0, color = 'k', alpha = 0.5, lw = 0.5)
-		# s.set_xlabel('time [s]')
-		# s.set_xlim([-1,9])
-		# s.set_ylabel('% signal change difference')
-		# sn.despine(offset=10)
+		s.set_xlabel('time [s]')
+		s.set_ylabel('% signal change STN ll')
+		sn.despine(offset=10)
+		s.set_xlim([0,15])
+		s.set_xticks([0,5,10,15])
+
+		-np.log10(np.array([sp.stats.ttest_ind(this_condition_data[0][:,i], this_condition_data[1][:,i])[1] for i in range(len(times))]))
+
 
 		pl.tight_layout()
 		pl.savefig(os.path.join(os.path.split(self.ssas[0].base_dir[:-1])[0], 'figs', roi + '_ll_corr_scatter_%s.pdf'%name_suffix))
-
+		pl.show()
+		shell()
 
