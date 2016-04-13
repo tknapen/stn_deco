@@ -37,22 +37,26 @@ def run_across(subject_ids, base_dir, tr):
 	# and this list is the only constructor argument
 	agg = Aggregator(ssas)
 
-	for roi in ['preSMAsmall', 'FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri']:
+	# for roi in ['FFA23', 'maxSTN25exc', 'V1', 'PstriatumNoVentri', 'PvmPFCNoventri', 'DLPFCposterior', 'LO31', 'maxGPi30exc', 'GPe30exc', 'Putamen40exc']: # 'preSMAsmall', 
 	# for roi in ['FFA23', 'maxSTN25exc', 'V1']:
-	# for roi in ['maxSTN25exc']:
-		for et in ['ll']: # 'ww', 'wl_u', 
-			# important categories:
-			# 'SSRT', 'RT.ll', 'RT.ww', 'RT.wl_u'
-			# agg.roi_deco_corrs(roi = roi, corr = ['alphaL','alphaG', 'SSRT', 'RTdiff.ll', 'RTdiff.ww'], event_type = et, name_suffix = 'all')
-			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', 'alphaL','alphaG'], event_type = et, name_suffix = 'all')
-			agg.roi_deco_corrs(roi = roi, corr = ['SSRT', "Acdiff.ll", 'RTdiff.ll'], event_type = et, name_suffix = 'SAR')
-			agg.roi_deco_corrs(roi = roi, corr = ["Qdww", "Qdll", "Qdwl.u"], event_type = et, name_suffix = 'Q')
-			# agg.roi_deco_corrs(roi = roi, corr = ['SSRT', 'medRTll', 'medRTww', 'medRTwl.u'], event_type = et, name_suffix = 'all')
-			pass
-		agg.roi_corrs(roi = roi, corr = ['SSRT', 'alphaL', 'alphaG'])
-		agg.roi_deco_groups(roi = roi)
+	for roi in ['maxSTN25exc']:
+		# for et in ['ww', 'wl_u', 'll']: # 
+		# 	agg.roi_deco_corrs(roi = roi, corr = ['SSRT'], event_type = et, name_suffix = 'SSRT')
 
-	pl.show()
+		# 	agg.roi_deco_corrs(roi = roi, corr = ["acww", "acll", "acwl.u"], event_type = et, name_suffix = 'acc')
+		# 	agg.roi_deco_corrs(roi = roi, corr = ["medRTww", "medRTll", "medRTwl.u"], event_type = et, name_suffix = 'medRT')
+	
+		# 	agg.roi_deco_corrs(roi = roi, corr = ["Acdiff.ww", "Acdiff.ll"], event_type = et, name_suffix = 'Acdiff')
+		# 	agg.roi_deco_corrs(roi = roi, corr = ["RTdiff.ww", "RTdiff.ll"], event_type = et, name_suffix = 'RTdiff')
+
+		# 	pass
+
+		# agg.roi_corrs(roi = roi, corr = ['SSRT', 'alphaL', 'alphaG'])
+		# agg.roi_deco_groups(roi = roi)
+
+		agg.roi_deco_corrs_final_SSRT()
+
+	# pl.show()
 
 	return True
 

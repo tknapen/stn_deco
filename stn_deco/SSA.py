@@ -106,7 +106,7 @@ class SSA(object):
 		h5f.close()
 		return rois
 
-	def deconvolution_roi(self, 
+	def deconvolution_roi_avg(self, 
 					roi = 'maxSTN25exc', 
 					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
 					deco_sample_frequency = 6.0, 
@@ -127,7 +127,7 @@ class SSA(object):
 						signal = data.squeeze(), 
 						events = [np.array(self.event_types_times[evt]) for evt in event_types], 
 						event_names = [evt.replace('.', '_') for evt in event_types], 
-						# durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
+						durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
 						sample_frequency = 1.0/self.TR,
 						deconvolution_frequency = deco_sample_frequency,
 						deconvolution_interval = deconvolution_interval
@@ -175,11 +175,90 @@ class SSA(object):
 		h5f.put('deco_results/%s'%(roi), deco_results)
 		h5f.close()
 
-	def gather_deco_results(self, roi):
+	def deconvolution_roi(self, 
+					roi = 'maxSTN25exc', 
+					event_types = ['ww', 'wl.u', 'wl.l', 'll'], 
+					deco_sample_frequency = 6.0, 
+					deconvolution_interval = [-3,15], 
+					pp_type = 'None',
+					ridge = False, 
+					rsq_threshold = 0.0):
+		"""deconvolution_roi takes data from a ROI and performs deconvolution on it.
+		arguments are roi (string), event_types (list of event type strings),
+		deco_sample_frequency (float), interval (list of two timepoints)
+		"""
+		self.preprocess_events(event_conditions = event_types)
+		data = self.preprocess_roi_data(self.raw_roi_data(roi), pp_type = pp_type)
+		nuis_data = np.hstack([self.preprocess_roi_data(self.raw_roi_data(nuis_roi), pp_type = 'Z') for nuis_roi in ['GM','WM','CV']])
+		moco_nuisances = self.preprocess_roi_data(self.raw_roi_data('moco_pars'), pp_type = 'Z')
+
+		# first, we initialize the object
+		fd = FIRDeconvolution(
+						signal = data.squeeze(), 
+						events = [np.array(self.event_types_times[evt]) for evt in event_types], 
+						event_names = [evt.replace('.', '_') for evt in event_types], 
+						durations = {evt.replace('.', '_'): np.array(self.event_types_durs[evt]) for evt in event_types},
+						sample_frequency = 1.0/self.TR,
+						deconvolution_frequency = deco_sample_frequency,
+						deconvolution_interval = deconvolution_interval
+						)
+
+		# we then tell it to create its design matrix
+		fd.create_design_matrix(intercept = True)
+
+		# decided not to use motion / nuisances
+		nuis_data_resampled = sp.signal.resample(nuis_data.T, fd.resampled_signal_size, axis = -1)
+		moco_nuis_data_resampled = sp.signal.resample(moco_nuisances.T, fd.resampled_signal_size, axis = -1)
+
+		# fd.add_continuous_regressors_to_design_matrix(np.r_[nuis_data_resampled, moco_nuis_data_resampled])
+		# fd.add_continuous_regressors_to_design_matrix(moco_nuis_data_resampled)
+
+		# perform the actual regression
+		if ridge:
+			fd.ridge_regress(cv = 20, alphas = np.r_[0,np.linspace(0.01, 100, 9)])	
+		else:
+			fd.regress(method = 'lstsq')
+
+		# and partition the resulting betas according to the different event types
+		fd.betas_for_events()
+
+		fd.calculate_rsq()
+		# select based on objective rsq threshold
+		# voxels_passing_threshold = fd.rsq > rsq_threshold
+		# or select based on ordering, and rsq threshold is a fraction of voxels.
+		# nr_selected_voxels = int(fd.rsq.shape[0] * rsq_threshold)
+		# voxels_passing_threshold = np.argsort(fd.rsq)[-nr_selected_voxels:]
+		# or all voxels for debugging.
+		voxels_passing_threshold = np.ones(fd.rsq.shape[0], dtype = bool)
+
+		self.logger.info("%s mean selected R squared is %1.3f" % (roi, fd.rsq[voxels_passing_threshold].mean()))
+
+		f = pl.figure(figsize = (8,6))
+		s = f.add_subplot(111)
+		s.set_title('FIR responses, mean selected Rsq is %1.3f'%fd.rsq[voxels_passing_threshold].mean())
+		for i, evt in enumerate([evt.replace('.', '_') for evt in event_types]):
+			pl.plot(fd.deconvolution_interval_timepoints, fd.betas_for_cov(evt)[:,voxels_passing_threshold].mean(axis = 1))
+
+		pl.legend([evt.replace('.', '_') for evt in event_types], loc = 2)
+		s.set_xlabel('time [s]')
+		s.set_ylabel('PSC [%]')
+		sn.despine(offset=10)
+
+		pl.tight_layout()
+		pl.savefig(os.path.join(self.base_dir, self.subject_id, self.subject_id + '_' + roi + '_allvoxels.pdf'))
+
+		deco_results = pd.DataFrame(np.squeeze([fd.betas_for_cov(evt.replace('.', '_'))[:,voxels_passing_threshold].mean(axis = 1) for evt in event_types]).T, 
+								index = fd.deconvolution_interval_timepoints, columns = [evt.replace('.', '_') for evt in event_types])
+
+		h5f = pd.HDFStore(self.hdf5_file, mode = 'a', complevel=9, complib='zlib' )
+		h5f.put('deco_results_all/%s'%(roi), deco_results)
+		h5f.close()
+
+	def gather_deco_results(self, roi, group = 'deco_results'):
 		"""gather_deco_results takes pre-saved roi-based from the hdf5 file and returns them as the dataframe that they are.
 		"""
 		h5f = pd.HDFStore(self.hdf5_file, mode = 'r')
-		deco_res = h5f.get('deco_results/%s'%(roi))
+		deco_res = h5f.get('%s/%s'%(group, roi))
 		h5f.close()
 
 		return deco_res
